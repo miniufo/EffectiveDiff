@@ -1,8 +1,6 @@
 //
 package cartesianRL;
 
-import java.util.Optional;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import miniufo.application.basic.DynamicMethodsInCTS;
 import miniufo.application.basic.VelocityFieldInCTS;
@@ -17,10 +15,12 @@ import miniufo.io.DataWrite;
 
 
 //
-public final class PrepareDiags{
+public final class ReductionDiags{
 	//
 	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("I:/Leith2/Stat.cts");
 	private static final DataDescriptor dd=df.getDataDescriptor();
+	private static final CartesianSpatialModel csm=new CartesianSpatialModel(dd);
+	private static final DynamicMethodsInCTS dm=new DynamicMethodsInCTS(csm);
 	
 	private static final int y=dd.getYCount();
 	private static final int x=dd.getXCount();
@@ -29,48 +29,56 @@ public final class PrepareDiags{
 	
 	
 	public static void main(String[] args){
-		cMeanAndLastTimeStreamFunction("Leith2/meanSF.dat",301,3600);
+		df.setPrinting(false);
 		
-		/*** get tracer mean, variance, and extrema **
+		//cMeanAndLastTimeStreamFunction("Leith2/meanSF.dat",301,3600);
+		
+		/*** get tracer mean, variance, and extrema ***/
 		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith4/aveVarEx.dat"); cdws.setPrinting(false);
-		IntStream.range(1,dd.getTCount()+1).sequential()
-			.peek(i->{ if(i%100==0) System.out.println(i);})
-			.mapToObj(i->getDataAt(i,"tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10","tr11","tr12","tr13","tr14","tr15","tr16"))
-			.map(vs->reduceToMeanVarianceAndExtremes(vs))
-			.forEach(vs->vs.forEach(v->cdws.writeData(v)));
-		cdws.closeFile();*/
-		
-		/*** get squared tracer and tracer gradient ***/
-		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith4/squaredGrd.dat"); cdws.setPrinting(false);
-		IntStream.range(1,dd.getTCount()+1).sequential()
-			.peek(i->{ if(i%100==0) System.out.println(i);})
-			.mapToObj(i->getDataAt(i,"tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10","tr11","tr12","tr13","tr14","tr15","tr16"))
-			.map(vs->reduceToSquareAndGrdSquareSum(vs))
-			.forEach(vs->vs.forEach(v->cdws.writeData(v)));
+		df.getVariablesTimeByTime("tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10","tr11","tr12","tr13","tr14","tr15","tr16")
+			.flatMap(vs->reduceToMeanVarianceAndExtremes(vs))
+			.forEach(v->{
+				int t=v.getRange().getTRange()[0];
+				if(t%100==0) System.out.println(t);
+				cdws.writeData(v);
+			});
 		cdws.closeFile();
+		
+		/*** get squared tracer and tracer gradient **
+		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith4/squaredGrd.dat"); cdws.setPrinting(false);
+		df.getVariablesTimeByTime("tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10","tr11","tr12","tr13","tr14","tr15","tr16")
+			.flatMap(vs->reduceToSquareAndGrdSquareSum(vs))
+			.forEach(v->{
+				int t=v.getRange().getTRange()[0];
+				if(t%100==0) System.out.println(t);
+				cdws.writeData(v);
+			});
+		cdws.closeFile();*/
 		
 		/*** get kinetic energy **
 		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith4/KE.dat"); cdws.setPrinting(false);
-		IntStream.range(1,dd.getTCount()+1).sequential()
-			.peek(i->{ if(i%100==0) System.out.println(i);})
-			.mapToObj(i->getDataAt(i,"u","v"))
-			.map(vs->reduceToKineticEnergy(vs))
-			.forEach(vs->vs.forEach(v->cdws.writeData(v)));
+		df.getVariablesTimeByTime("u","v")
+			.map(vs->reduceToKESum(vs[0],vs[1]))
+			.forEach(v->{
+				int t=v.getRange().getTRange()[0];
+				if(t%100==0) System.out.println(t);
+				cdws.writeData(v);
+			});
 		cdws.closeFile();*/
 	}
 	
 	
 	static void cMeanAndLastTimeStreamFunction(String out,int tstr,int tend){
 		/*** get mean u,v ***/
-		Variable um=IntStream.range(tstr,tend+1).mapToObj(i->getOneVar(i,"u")).reduce((v1,v2)->v1.plusEq(v2)).get();
-		Variable vm=IntStream.range(tstr,tend+1).mapToObj(i->getOneVar(i,"v")).reduce((v1,v2)->v1.plusEq(v2)).get();
+		Variable um=df.getVariableTimeByTime(tstr,tend,"u").reduce((v1,v2)->v1.plusEq(v2)).get();
+		Variable vm=df.getVariableTimeByTime(tstr,tend,"v").reduce((v1,v2)->v1.plusEq(v2)).get();
 		
 		um.divideEq(tend-tstr+1);
 		vm.divideEq(tend-tstr+1);
 		
 		/*** get last time u,v ***/
-		Variable ui=getOneVar(tend,"u");
-		Variable vi=getOneVar(tend,"v");
+		Variable ui=df.getVariables(new Range("t("+tend+","+tend+")",dd),"u")[0];
+		Variable vi=df.getVariables(new Range("t("+tend+","+tend+")",dd),"v")[0];
 		
 		CartesianSpatialModel csm=new CartesianSpatialModel(dd);
 		VelocityFieldInCTS     vf=new VelocityFieldInCTS(csm);
@@ -86,33 +94,19 @@ public final class PrepareDiags{
 	}
 	
 	
-	static Stream<Variable> reduceToKineticEnergy(Stream<Variable> vs){
-		Optional<Variable> op=vs.map(v->v.square().divideEq(2f)).reduce((v1,v2)->v1.plusEq(v2));
+	static Stream<Variable> reduceToSquareAndGrdSquareSum(Variable[] vs){
+		return Stream.of(vs).flatMap(v->reduceToSquareAndGrdSquareSum(v));
+	}
+	
+	static Stream<Variable> reduceToMeanVarianceAndExtremes(Variable[] vs){
+		return Stream.of(vs).flatMap(v->reduceToMeanVarianceAndExtremes(v));
+	}
+	
+	
+	static Variable reduceToKESum(Variable u,Variable v){
+		Variable ke=u.square().plusEq(v.square()).divideEq(2f);
+		ke.setName("ke"); ke.setComment("kinetic energy");
 		
-		if(op.isPresent()){
-			Variable ke=op.get();
-			
-			ke.setName("ke");
-			ke.setComment("kinetic energy");
-			
-			return Stream.of(reduceToSum(ke));
-			
-		}else throw new IllegalArgumentException("no ke found");
-	}
-	
-	static Stream<Variable> reduceToSquareAndGrdSquareSum(Stream<Variable> vs){
-		CartesianSpatialModel csm=new CartesianSpatialModel(dd);
-		DynamicMethodsInCTS    dm=new DynamicMethodsInCTS(csm);
-		
-		return vs.flatMap(v->reduceToSquareAndGrdSquareSum(v,dm.c2DGradientMagnitude(v)));
-	}
-	
-	static Stream<Variable> reduceToMeanVarianceAndExtremes(Stream<Variable> vs){
-		return vs.flatMap(v->reduceToMeanVarianceAndExtremes(v));
-	}
-	
-	
-	static Variable reduceToSum(Variable ke){
 		float undef=ke.getUndef();
 		
 		float[][] vdata=ke.getData()[0][0];
@@ -133,7 +127,9 @@ public final class PrepareDiags{
 		return keRe;
 	}
 	
-	static Stream<Variable> reduceToSquareAndGrdSquareSum(Variable v,Variable vgrd){
+	static Stream<Variable> reduceToSquareAndGrdSquareSum(Variable v){
+		Variable vgrd=dm.c2DGradientMagnitude(v);
+		
 		float undef=v.getUndef();
 		
 		Variable vari2Sum=new Variable(v.getName()+ "2sum",new Range(1,1,1,1));
@@ -233,26 +229,5 @@ public final class PrepareDiags{
 		if(avedata[0]<mindata[0]) throw new IllegalArgumentException("ave < min");
 		
 		return Stream.of(ave,var,max,min);
-	}
-	
-	
-	static Stream<Variable> getDataAt(int t,String... vars){
-		df.setPrinting(false);
-		
-		Variable[] vs=df.getVariables(new Range("t("+t+","+t+")",dd),vars);
-		
-		for(Variable v:vs) v.replaceUndefData(-9.99e8f);
-		
-		return Stream.of(vs);
-	}
-	
-	static Variable getOneVar(int t,String vname){
-		df.setPrinting(false);
-		
-		Variable v=df.getVariables(new Range("t("+t+","+t+")",dd),vname)[0];
-		
-		v.replaceUndefData(-9.99e8f);
-		
-		return v;
 	}
 }

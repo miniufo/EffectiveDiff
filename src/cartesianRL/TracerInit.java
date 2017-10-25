@@ -33,10 +33,10 @@ public final class TracerInit{
 	
 	//
 	public static void main(String[] args){
-		Variable v=DiagnosisFactory.getVariables(path+"Leith4/DYE/dye_SF.ctl","","dye")[0];
-		replaceTracerFields(path+"Leith4/DYE/pickup_ptracers.0000103680.data",v,DataPrec.float64);
+		//Variable v=DiagnosisFactory.getVariables(path+"Leith4/DYE/dye_SF.ctl","","dye")[0];
+		//replaceTracerFields(path+"Leith4/DYE/pickup_ptracers.0000103680.data",v,DataPrec.float64);
 		//generateBath(path+"BATH/bath.dat");
-		//generateTaux(path+"EXF/taux.dat");
+		generateTaux(path+"EXF/taux.dat");
 		//for(int i=1;i<=16;i++) generateDye(path+"DYE/dye"+i+".dat",i);
 		//generateDyeFromSF(path+"Leith10/meanSF.cts",path+"Leith10/DYE/dye_SF.dat");
 	}

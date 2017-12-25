@@ -17,7 +17,7 @@ import miniufo.io.DataWrite;
 //
 public final class ReductionDiags{
 	//
-	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("I:/Leith2/Stat.cts");
+	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("H:/cartRL_advSchemes/Leith1_k100/Stat.cts");
 	private static final DataDescriptor dd=df.getDataDescriptor();
 	private static final CartesianSpatialModel csm=new CartesianSpatialModel(dd);
 	private static final DynamicMethodsInCTS dm=new DynamicMethodsInCTS(csm);
@@ -33,38 +33,38 @@ public final class ReductionDiags{
 		
 		//cMeanAndLastTimeStreamFunction("Leith2/meanSF.dat",301,3600);
 		
-		/*** get tracer mean, variance, and extrema ***/
-		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith4/aveVarEx.dat"); cdws.setPrinting(false);
-		df.getVariablesTimeByTime("tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10","tr11","tr12","tr13","tr14","tr15","tr16")
-			.flatMap(vs->reduceToMeanVarianceAndExtremes(vs))
-			.forEach(v->{
-				int t=v.getRange().getTRange()[0];
+		/*** get tracer mean, variance, and extrema **
+		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith1/Leith1_k100/aveVarEx.dat"); cdws.setPrinting(false);
+		df.getVariablesTimeByTime("tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10")
+			.peek(vs->{
+				int t=vs[0].getRange().getTRange()[0];
 				if(t%100==0) System.out.println(t);
-				cdws.writeData(v);
-			});
-		cdws.closeFile();
+			})
+			.flatMap(vs->reduceToMeanVarianceAndExtremes(vs))
+			.forEach(v->cdws.writeData(v));
+		cdws.closeFile();*/
 		
 		/*** get squared tracer and tracer gradient **
-		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith4/squaredGrd.dat"); cdws.setPrinting(false);
-		df.getVariablesTimeByTime("tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10","tr11","tr12","tr13","tr14","tr15","tr16")
-			.flatMap(vs->reduceToSquareAndGrdSquareSum(vs))
-			.forEach(v->{
-				int t=v.getRange().getTRange()[0];
+		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith1/Leith1_k100/squaredGrd.dat"); cdws.setPrinting(false);
+		df.getVariablesTimeByTime("tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10")
+			.peek(vs->{
+				int t=vs[0].getRange().getTRange()[0];
 				if(t%100==0) System.out.println(t);
-				cdws.writeData(v);
-			});
+			})
+			.flatMap(vs->reduceToSquareAndGrdSquareSum(vs))
+			.forEach(v->cdws.writeData(v));
 		cdws.closeFile();*/
 		
-		/*** get kinetic energy **
-		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith4/KE.dat"); cdws.setPrinting(false);
+		/*** get kinetic energy ***/
+		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith1/Leith1_k100/KE.dat"); cdws.setPrinting(false);
 		df.getVariablesTimeByTime("u","v")
-			.map(vs->reduceToKESum(vs[0],vs[1]))
-			.forEach(v->{
-				int t=v.getRange().getTRange()[0];
+			.peek(vs->{
+				int t=vs[0].getRange().getTRange()[0];
 				if(t%100==0) System.out.println(t);
-				cdws.writeData(v);
-			});
-		cdws.closeFile();*/
+			})
+			.map(vs->reduceToKESum(vs[0],vs[1]))
+			.forEach(v->cdws.writeData(v));
+		cdws.closeFile();
 	}
 	
 	
@@ -94,6 +94,7 @@ public final class ReductionDiags{
 	}
 	
 	
+	
 	static Stream<Variable> reduceToSquareAndGrdSquareSum(Variable[] vs){
 		return Stream.of(vs).flatMap(v->reduceToSquareAndGrdSquareSum(v));
 	}
@@ -102,8 +103,10 @@ public final class ReductionDiags{
 		return Stream.of(vs).flatMap(v->reduceToMeanVarianceAndExtremes(v));
 	}
 	
-	
 	static Variable reduceToKESum(Variable u,Variable v){
+		changeBCToUndef(u);
+		changeBCToUndef(v);
+		
 		Variable ke=u.square().plusEq(v.square()).divideEq(2f);
 		ke.setName("ke"); ke.setComment("kinetic energy");
 		
@@ -119,6 +122,7 @@ public final class ReductionDiags{
 		}
 		
 		Variable keRe=new Variable(ke.getName(),new Range(1,1,1,1));
+		keRe.getRange().setTRange(v.getRange());
 		
 		keRe.getData()[0][0][0][0]=(float)sum;
 		
@@ -128,6 +132,8 @@ public final class ReductionDiags{
 	}
 	
 	static Stream<Variable> reduceToSquareAndGrdSquareSum(Variable v){
+		changeBCToUndef(v);
+		
 		Variable vgrd=dm.c2DGradientMagnitude(v);
 		
 		float undef=v.getUndef();
@@ -137,6 +143,9 @@ public final class ReductionDiags{
 		
 		vari2Sum.setCommentAndUnit("sum of squared "+v.getName()+" (unit)"  );
 		vgrd2Sum.setCommentAndUnit("sum of squared "+v.getName()+" gradient (unit^2)");
+		
+		vari2Sum.getRange().setTRange(v.getRange());
+		vgrd2Sum.getRange().setTRange(v.getRange());
 		
 		float[][] vdata=   v.getData()[0][0];
 		float[][] gdata=vgrd.getData()[0][0];
@@ -185,6 +194,11 @@ public final class ReductionDiags{
 		max.setCommentAndUnit("maximum  of "+v.getName()+" (unit)"  );
 		min.setCommentAndUnit("minimum  of "+v.getName()+" (unit)"  );
 		
+		ave.getRange().setTRange(v.getRange());
+		var.getRange().setTRange(v.getRange());
+		max.getRange().setTRange(v.getRange());
+		min.getRange().setTRange(v.getRange());
+		
 		float[][] vdata=  v.getData()[0][0];
 		float[] avedata=ave.getData()[0][0][0];
 		float[] vardata=var.getData()[0][0][0];
@@ -229,5 +243,30 @@ public final class ReductionDiags{
 		if(avedata[0]<mindata[0]) throw new IllegalArgumentException("ave < min");
 		
 		return Stream.of(ave,var,max,min);
+	}
+	
+	
+	static void changeBCToUndef(Variable v){
+		int t=v.getTCount(); int z=v.getZCount();
+		int y=v.getYCount(); int x=v.getXCount();
+		
+		float[][][][] vdata=v.getData();
+		
+		if(v.isTFirst()){
+			for(int l=0;l<t;l++)
+			for(int k=0;k<z;k++){
+				for(int j=0;j<y;j++) vdata[l][k][j][x-1]=-9.99e8f;
+				for(int i=0;i<x;i++) vdata[l][k][y-1][i]=-9.99e8f;
+			}
+			
+		}else{
+			for(int l=0;l<t;l++)
+			for(int k=0;k<z;k++){
+				for(int j=0;j<y;j++) vdata[k][j][x-1][l]=-9.99e8f;
+				for(int i=0;i<x;i++) vdata[k][y-1][i][l]=-9.99e8f;
+			}
+		}
+		
+		v.setUndef(-9.99e8f);
 	}
 }

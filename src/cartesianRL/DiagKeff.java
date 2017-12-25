@@ -1,36 +1,49 @@
 //
 package cartesianRL;
 
+import java.util.stream.Stream;
 import miniufo.application.contour.ContourCartesianSpatialModel;
 import miniufo.application.contour.KeffInCTS;
-import miniufo.application.statisticsModel.FilterMethods;
 import miniufo.basic.InterpolationModel.Type;
-import miniufo.descriptor.CtsDescriptor;
+import miniufo.descriptor.DataDescriptor;
 import miniufo.diagnosis.DiagnosisFactory;
-import miniufo.diagnosis.Range;
 import miniufo.diagnosis.Variable;
-import miniufo.io.DataIOFactory;
-import miniufo.io.DataWrite;
+import miniufo.io.CtlDataWriteStream;
 
 //
 public final class DiagKeff{
 	//
 	private static final int numOfC=201;
 	private static final int interpY=400;
+	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("H:/cartRL_advSchemes/Leith1_k0/Stat.cts");
+	private static final DataDescriptor dd=df.getDataDescriptor();
+	private static final ContourCartesianSpatialModel ccsm=new ContourCartesianSpatialModel(dd);
 	private static final String path=Grids.path;
 	
 	
 	//
 	public static void main(String[] args){
-		String test="runH100";
-		DiagnosisFactory df=DiagnosisFactory.parseFile(path+"dispInCC/"+test+"/Stat.cts");
-		CtsDescriptor dd=(CtsDescriptor)(df.getDataDescriptor());
+		df.setPrinting(false);
 		
-		Variable tr=df.getVariables(new Range("",dd),"tr6")[0];
+		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith1/Leith1_k0/Keff.dat"); cdws.setPrinting(false);
+		df.getVariablesTimeByTime("tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10")
+			.peek(vs->{
+				int t=vs[0].getRange().getTRange()[0];
+				if(t%100==0) System.out.println(t);
+			})
+			.flatMap(vs->computeKeffs(vs))
+			.forEach(v->cdws.writeData(v));
+		cdws.closeFile();
+	}
+	
+	
+	static Stream<Variable> computeKeffs(Variable[] vs){
+		return Stream.of(vs).flatMap(v->computeKeff(v));
+	}
+	
+	static Stream<Variable> computeKeff(Variable tr){
+		ReductionDiags.changeBCToUndef(tr);
 		
-		tr.replaceUndefData(-9999);
-		
-		ContourCartesianSpatialModel ccsm=new ContourCartesianSpatialModel(dd);
 		ccsm.initContourByTracer(tr,numOfC,2,true);
 		KeffInCTS keffCTS=new KeffInCTS(ccsm);
 		
@@ -61,6 +74,7 @@ public final class DiagKeff{
 		Lmin2      =ccsm.interpolatedToYs(Lmin2      ,interpY,t);
 		nkeff      =ccsm.interpolatedToYs(nkeff      ,interpY,t);
 		
+		/*
 		FilterMethods.TRunningMean(area       ,5);
 		FilterMethods.TRunningMean(tracer     ,5);
 		FilterMethods.TRunningMean(qGrdA      ,5);
@@ -69,9 +83,8 @@ public final class DiagKeff{
 		FilterMethods.TRunningMean(dqdye      ,5);
 		FilterMethods.TRunningMean(Le2        ,5);
 		FilterMethods.TRunningMean(Lmin2      ,5);
-		FilterMethods.TRunningMean(nkeff      ,5);
+		FilterMethods.TRunningMean(nkeff      ,5);*/
 		
-		DataWrite dw=DataIOFactory.getDataWrite(dd,path+"dispInCC/"+test+"/KeffF.dat");
-		dw.writeData(dd,tracer,area,qGrdA,intGrd2,aveGrd2AlgC,dqdye,nkeff,Le2,Lmin2); dw.closeFile();
+		return Stream.of(tracer,area,qGrdA,intGrd2,aveGrd2AlgC,dqdye,nkeff,Le2,Lmin2);
 	}
 }

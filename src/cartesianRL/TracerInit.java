@@ -22,13 +22,13 @@ import static java.lang.Math.PI;
 //
 public final class TracerInit{
 	//
-	private static final int y=Grids.y;
-	private static final int x=Grids.x;
+	private static final int y=Parameters.y;
+	private static final int x=Parameters.x;
 	
-	private static final float depth=Grids.depth;
-	private static final float tauMax=Grids.tauMax;
+	private static final float depth=Parameters.depth;
+	private static final float tauMax=Parameters.tauMax;
 	
-	private static final String path=Grids.path;
+	private static final String path=Parameters.path;
 	
 	
 	//

@@ -13,7 +13,7 @@ import miniufo.io.CtlDataWriteStream;
 public final class mapKeffToXY{
 	//
 	private static final int numOfC=201;
-	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("H:/cartRL_advSchemes/Leith1_k0/Stat.cts");
+	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("H:/cartRL_advSchemes/Leith1_k200/Stat.cts");
 	private static final DataDescriptor dd=df.getDataDescriptor();
 	private static final ContourCartesianSpatialModel ccsm=new ContourCartesianSpatialModel(dd);
 	
@@ -22,7 +22,7 @@ public final class mapKeffToXY{
 	public static void main(String[] args){
 		df.setPrinting(false);
 		
-		CtlDataWriteStream cdws=new CtlDataWriteStream("H:/cartRL_advSchemes/Leith1/Leith1_k0/Keff.dat");
+		CtlDataWriteStream cdws=new CtlDataWriteStream("H:/cartRL_advSchemes/Leith1_k200/KeffXY.dat");
 		cdws.setPrinting(false);
 		
 		df.getVariablesTimeByTime("tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10")

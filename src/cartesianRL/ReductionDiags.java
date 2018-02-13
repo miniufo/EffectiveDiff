@@ -17,7 +17,7 @@ import miniufo.io.DataWrite;
 //
 public final class ReductionDiags{
 	//
-	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("F:/cartRL_advSchemes/Leith1_k0/Stat.cts");
+	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("H:/cartRL_advSchemes/Leith1_k0/Stat.cts");
 	private static final DataDescriptor dd=df.getDataDescriptor();
 	private static final CartesianSpatialModel csm=new CartesianSpatialModel(dd);
 	private static final DynamicMethodsInCTS dm=new DynamicMethodsInCTS(csm);
@@ -25,7 +25,7 @@ public final class ReductionDiags{
 	private static final int y=dd.getYCount();
 	private static final int x=dd.getXCount();
 	
-	private static final String path=Grids.path;
+	private static final String path=Parameters.path;
 	
 	
 	public static void main(String[] args){

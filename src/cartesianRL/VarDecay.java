@@ -15,10 +15,10 @@ import miniufo.util.TicToc;
 //
 public final class VarDecay{
 	//
-	private static final int y=Grids.y;
-	private static final int x=Grids.x;
+	private static final int y=Parameters.y;
+	private static final int x=Parameters.x;
 	
-	private static final String path=Grids.path;
+	private static final String path=Parameters.path;
 	
 	//
 	public static void main(String[] args){

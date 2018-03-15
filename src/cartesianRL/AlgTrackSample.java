@@ -2,27 +2,21 @@
 package cartesianRL;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import fltDispersion.FLTUtils;
 import fltDispersion.FltParticle;
-import miniufo.application.basic.DynamicMethodsInCTS;
 import miniufo.application.contour.ContourCartesianSpatialModel;
 import miniufo.application.statisticsModel.LagrangianStatisticsByDavis;
 import miniufo.application.statisticsModel.SingleParticleStatResult;
 import miniufo.basic.ArrayUtil;
 import miniufo.concurrent.ConcurrentUtil;
 import miniufo.descriptor.DataDescriptor;
-import miniufo.diagnosis.CartesianSpatialModel;
 import miniufo.diagnosis.DiagnosisFactory;
 import miniufo.diagnosis.MDate;
 import miniufo.diagnosis.Range;
@@ -31,240 +25,146 @@ import miniufo.io.CtlDataWriteStream;
 import miniufo.io.DataIOFactory;
 import miniufo.io.DataWrite;
 import miniufo.io.IOUtil;
+import miniufo.lagrangian.AttachedMeta;
+import miniufo.lagrangian.LagrangianSampling;
 import miniufo.lagrangian.LagrangianUtil;
 import miniufo.lagrangian.Particle;
 import miniufo.lagrangian.Record;
 import miniufo.statistics.FilterModel;
-import miniufo.util.GridDataFetcher;
-import miniufo.util.TicToc;
 
 //
 public final class AlgTrackSample{
 	//
-	private static int varGroups=4;
-	
-	private static String[] uvNames =new String[]{"u","v"};
-	private static String[] trcNames=new String[]{"tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10"};
-	private static String[] varNames=new String[uvNames.length+trcNames.length];
-	private static String[] grdNames=new String[uvNames.length+trcNames.length];
-	private static String[] YeqNames=new String[uvNames.length+trcNames.length];
-	private static String[] dspNames=new String[uvNames.length+trcNames.length];
-	
-	private static final String path=Parameters.path;
-	
-	static{
-		for(int i=0,I=uvNames.length;i<I;i++){
-			varNames[i]=uvNames[i];
-			grdNames[i]=uvNames[i]+"grd";
-			YeqNames[i]=uvNames[i]+"Yeq";
-			dspNames[i]=uvNames[i]+"dsp";
-		}
-		for(int i=0,I=trcNames.length;i<I;i++){
-			varNames[i+uvNames.length]=trcNames[i];
-			grdNames[i+uvNames.length]=trcNames[i]+"grd";
-			YeqNames[i+uvNames.length]=trcNames[i]+"Yeq";
-			dspNames[i+uvNames.length]=trcNames[i]+"dsp";
-		}
-	}
+	static final AttachedMeta UVEL=new AttachedMeta("uvel",0);
+	static final AttachedMeta VVEL=new AttachedMeta("vvel",1);
+	static final AttachedMeta USPL=new AttachedMeta("uspl",2);
+	static final AttachedMeta VSPL=new AttachedMeta("vspl",3);
+	static final AttachedMeta TRS =new AttachedMeta("tr9" ,4);
+	static final AttachedMeta GRD =new AttachedMeta("grd" ,5);
+	static final AttachedMeta Yeq =new AttachedMeta("Yeq" ,6);
+	static final AttachedMeta DSP =new AttachedMeta("DSP" ,7);
 	
 	
 	//
 	public static void main(String[] args){
-		String test="runK150";
+		String test="runH50";
 		
+		//FLTUtils.combineFLTOutIntoBin("H:/dispInCC/"+test+"/fltOutput/",Parameters.baseTime); System.exit(0);
 		
-		/*
-		List<FltParticle> fps=FLTUtils.readFLTTrajectory(path+"dispInCC/"+test+"/fltOutput/",new MDate(2000,1,1,0,0),rec->true);
-		System.out.println("finish reading "+fps.size()+" FltParticles");
-		try(ObjectOutputStream oos=new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(path+"dispInCC/"+test+"/fltOutput/FltParticle.bin"),819200))){
-			for(FltParticle p:fps) oos.writeObject(p);
-			oos.writeObject(null);
-			
-		}catch(IOException e){ e.printStackTrace(); System.exit(0);}
-		
-		System.exit(0);
+		main_regions(test); System.exit(0);
 		
 		List<Particle> ls=new ArrayList<>(55530);
 		
-		try(ObjectInputStream ois=new ObjectInputStream(new BufferedInputStream(new FileInputStream(path+"dispInCC/"+test+"/fltOutput/FltParticle.bin"),819200))){
+		try(ObjectInputStream ois=new ObjectInputStream(new BufferedInputStream(new FileInputStream("H:/dispInCC/"+test+"/fltOutput/float_trajAll.bin"),819200))){
 			while(true){
 				FltParticle p=(FltParticle)(ois.readObject());
 				if(p==null) break;
 				
-				ls.add(FLTUtils.toParticle(p,
-					2+varNames.length*varGroups,
-					ArrayUtil.concatAll(String.class,new String[]{"uvel","vvel"},uvNames,trcNames,grdNames,dspNames),
-					false
-				));
+				ls.add(FLTUtils.toParticle(p,false,UVEL,VVEL,USPL,VSPL,TRS,GRD,Yeq,DSP));
 			}
 			
 		}catch(IOException|ClassNotFoundException e){ e.printStackTrace(); System.exit(0);}
 		
-		samplePTracers(ls,"H:/cartRL_advSchemes/Leith1_k0/Stat.cts");
-		tracerValueToEqvY(ls,"H:/cartRL_advSchemes/Leith1_k0/Stat.cts");
+		new LagrangianSampling(ls).sampleVariables("H:/dispInCC/"+test+"/Stat.cts",TRS,GRD);
+		tracerValueToEqvY(ls,"H:/dispInCC/"+test+"/Stat.cts");
 		cCrossContourDisplacement(ls);
 		
+		System.out.println(ls.get(1000).toString());
+		
 		LagrangianUtil.asRecordStream(ls).forEach(r->{
-			r.setData(2,r.getXPos());
-			r.setData(3,r.getYPos());
+			r.setData(USPL,r.getXPos());
+			r.setData(VSPL,r.getYPos());
 		});
 		
 		ConcurrentUtil.initDefaultExecutor(2);
-		for(int i=1;i<=trcNames.length;i++){
-			cYPositionByDisplacement(ls,i);
-			calDiffMap(ls,i);
-		}
-		ConcurrentUtil.shutdown(); System.exit(0);*/
-		
-		
-		
-		
+		cYPositionByDisplacement(ls);
+		calDiffMap(ls,test);
+		ConcurrentUtil.shutdown(); System.exit(0);
+	}
+	
+	static void main_regions(String test){
 		LagrangianStat.regions.forEach(region->{
-			/**/
+			/*
 			List<Particle> ps=Parameters.getParticlesDeployedInRegion(
-				path+"fltInit_11km_All.bin",path+"dispInCC/"+test+"/fltOutput/",region,2+varNames.length*varGroups,
-				ArrayUtil.concatAll(String.class,new String[]{"uvel","vvel"},uvNames,trcNames,grdNames,dspNames)
+				Parameters.path+"fltInit_11km_All.bin",
+				"H:/dispInCC/"+test+"/fltOutput/",
+				region,2+varNames.length*varGroups,
+				ArrayUtil.concatAll(String.class,new String[]{"uvel","vvel"},uvNames,trcNames,grdNames,YeqNames,dspNames)
 			);
 			
-			samplePTracers(ps,"H:/cartRL_advSchemes/Leith1_k0/Stat.cts");
-			tracerValueToEqvY(ps,"H:/cartRL_advSchemes/Leith1_k0/Stat.cts");
+			samplePTracerAndGradient(ps,"H:/dispInCC/"+test+"/Stat.cts");
+			tracerValueToEqvY(ps,"H:/dispInCC/"+test+"/Stat.cts");
 			cCrossContourDisplacement(ps);
-			toAlongTrackFile(ps,path+"dispInCC/"+test+"/algTrack/algTrackData"+region.getName()+".dat");
+			toAlongTrackFile(ps,Parameters.path+"dispInCC/"+test+"/algTrack/algTrackData"+region.getName()+".dat");
 			//LagrangianUtil.writeTrajecories(ps,path+"dispInCC/"+test+"/TXT/",true,p->true);
 			
-			LagrangianUtil.writeAsBinaryFile(ps,path+"dispInCC/"+test+"/algTrack/Particles"+region.getName()+".bin");
+			LagrangianUtil.writeAsBinaryFile(ps,Parameters.path+"dispInCC/"+test+"/algTrack/Particles"+region.getName()+".bin");*/
 			
-			//List<Particle> ps=LagrangianUtil.readFromBinaryFile(path+"dispInCC/"+test+"/algTrack/Particles"+region.getName()+".bin");
+			List<Particle> ps=LagrangianUtil.readFromBinaryFile(Parameters.path+"dispInCC/"+test+"/algTrack/Particles"+region.getName()+".bin");
 			
-			//for(int i=1;i<10;i++){
-			//	cYPositionByDisplacement(ps,i);
-			//	toSPStatFile(ps,path+"dispInCC/"+test+"/LagStat/CTCoord/"+region.getName(),i);
-			//}
+			cYPositionByDisplacement(ps);
+			toSPStatFile(ps,Parameters.path+"dispInCC/"+test+"/LagStat/CTCoord/"+region.getName());
 		});
 	}
 	
-	
-	static void samplePTracers(List<Particle> ps,String cts){
-		DiagnosisFactory df=DiagnosisFactory.parseFile(cts);
-		DataDescriptor dd=df.getDataDescriptor();
-		
-		int tLen=ps.get(0).getTCount();
-		int ttag=dd.getTNum(ps.get(0).getTime(0))+1;
-		
-		CartesianSpatialModel csm=new CartesianSpatialModel(dd);
-		GridDataFetcher gdf=new GridDataFetcher(dd);
-		
-		DynamicMethodsInCTS dm=new DynamicMethodsInCTS(csm);
-		
-		System.out.println("ttag for initial time ("+ps.get(0).getTime(0)+"): "+ttag);
-		
-		for(int m=0,M=varNames.length;m<M;m++){
-			TicToc.tic("samping "+varNames[m]);
-			Variable buffer=gdf.prepareXYTBuffer(varNames[m],1,ttag,tLen,0);buffer.replaceUndefData(Record.undef);
-			Variable bufGrd=dm.c2DGradientMagnitude(buffer);
-			
-			final int mm=m+2;
-			ps.stream().flatMap(p->p.stream()).forEach(r->{
-				float tr=gdf.fetchXYTBuffer(r.getXPos(),r.getYPos(),r.getTime(),buffer);
-				float gd=gdf.fetchXYTBuffer(r.getXPos(),r.getYPos(),r.getTime(),bufGrd);
-				
-				r.setData(mm                ,tr);
-				r.setData(mm+varNames.length,gd);
-			});
-			TicToc.toc(TimeUnit.SECONDS);
-		}
-		
-		gdf.closeFile();
-	}
 	
 	static void tracerValueToEqvY(List<Particle> ps,String cts){
 		DiagnosisFactory df=DiagnosisFactory.parseFile(cts);df.setPrinting(false);
 		DataDescriptor dd=df.getDataDescriptor();
 		
 		int tLen=ps.get(0).getTCount();
-		int ttag=dd.getTNum(ps.get(0).getTime(0));
-		System.out.println("ttag: "+ttag);
+		int ttag=dd.getTNum(ps.get(0).getTime(0))+1;
+		
+		System.out.println("ttag for initial time in tracerValueToEqvY() ("+ps.get(0).getTime(0)+"): "+ttag);
 		
 		ContourCartesianSpatialModel ccsm=new ContourCartesianSpatialModel(dd);
 		//Variable[] trs=df.getVariables(new Range("t("+(ttag+1)+","+(ttag+1)+")",dd),varNames);
 		
 		for(int l=0;l<tLen;l++){
-			Variable[] trs=df.getVariables(new Range("t("+(ttag+l+1)+","+(ttag+l+1)+")",dd),varNames);
+			if(l%10==0) System.out.println("tracerToEqvY at "+l);
 			
-			for(int k=0,K=trs.length;k<K;k++){
-				trs[k].replaceUndefData(Record.undef);
+			Variable tr=df.getVariables(new Range("t("+(ttag+l)+","+(ttag+l)+")",dd),TRS.name)[0];
+			
+			tr.replaceUndefData(Record.undef);
+			
+			float[][] tdata=tr.getData()[0][0];
+			float[] extrema=ArrayUtil.getExtrema(tdata,tr.getUndef());
+			
+			double[] cVals=new double[ps.size()];
+			
+			for(int i=0,I=ps.size();i<I;i++){
+				Particle p=ps.get(i);
 				
-				float[][] tdata=trs[k].getData()[0][0];
-				float[] extrema=ArrayUtil.getExtrema(tdata,trs[k].getUndef());
-				
-				double[] cVals=new double[ps.size()];
-				
-				for(int i=0,I=ps.size();i<I;i++){
-					Particle p=ps.get(i);
-					
-					cVals[i]=p.getRecord(l).getDataValue(2+k);
-					if(cVals[i]!=Record.undef&&cVals[i]<extrema[0]){
-						System.out.println(p.getID()+", z: "+k+", l: "+i+",   cVals[l]: "+cVals[i]+",  min: "+extrema[0]+", "+varNames[k]);
-						cVals[i]=extrema[0];
-					}
-					if(cVals[i]!=Record.undef&&cVals[i]>extrema[1]){
-						System.out.println(p.getID()+", z: "+k+", l: "+i+",   cVals[l]: "+cVals[i]+",  max: "+extrema[1]+", "+varNames[k]);
-						cVals[i]=extrema[1];
-					}
+				cVals[i]=p.getRecord(l).getDataValue(TRS);
+				if(cVals[i]!=Record.undef&&cVals[i]<extrema[0]){
+					System.out.println(p.getID()+", i: "+i+",   cVals[i]: "+cVals[i]+",  min: "+extrema[0]+", "+tr.getName());
+					cVals[i]=extrema[0];
 				}
-				
-				double[] Ys=ccsm.computeEquivalentYs(trs[k],cVals,2);
-				
-				for(int i=0,I=ps.size();i<I;i++) ps.get(i).getRecord(l).setData(2+k+2*varNames.length,(float)Ys[i]);
+				if(cVals[i]!=Record.undef&&cVals[i]>extrema[1]){
+					System.out.println(p.getID()+", i: "+i+",   cVals[i]: "+cVals[i]+",  max: "+extrema[1]+", "+tr.getName());
+					cVals[i]=extrema[1];
+				}
 			}
+			
+			double[] Ys=ccsm.computeEquivalentYs(tr,cVals,2,false);
+			
+			for(int i=0,I=ps.size();i<I;i++) ps.get(i).getRecord(l).setData(Yeq,(float)Ys[i]);
 		}
-		
-		/**
-		for(int k=0,K=trs.length;k<K;k++){
-			trs[k].replaceUndefData(Record.undef);
-			
-			float[][] tdata=trs[k].getData()[0][0];
-			float[] extrema=ArrayUtil.getExtrema(tdata,trs[k].getUndef());
-			
-			for(Particle p:ps){
-				int C=p.getTCount();
-				
-				double[] cVals=new double[C];
-				
-				for(int l=0;l<C;l++){
-					cVals[l]=p.getRecord(l).getDataValue(k+offset);
-					if(cVals[l]!=Record.undef&&cVals[l]<extrema[0]){
-						System.out.println(p.getID()+", z: "+k+", l: "+l+",   cVals[l]: "+cVals[l]+",  min: "+extrema[0]);
-						cVals[l]=extrema[0];
-					}
-					if(cVals[l]!=Record.undef&&cVals[l]>extrema[1]){
-						System.out.println(p.getID()+", z: "+k+", l: "+l+",   cVals[l]: "+cVals[l]+",  max: "+extrema[1]);
-						cVals[l]=extrema[1];
-					}
-				}
-				
-				double[] Ys=ccsm.computeEquivalentYs(trs[k],cVals,2);
-				
-				for(int l=0;l<C;l++) p.getRecord(l).setData(k+offset,(float)Ys[l]);
-			}
-		}*/
 	}
 	
 	static void cCrossContourDisplacement(List<Particle> ps){
 		System.out.println("cross-contour displacement");
-		ps.stream().forEach(p->{
-			for(int i=1,I=varNames.length-2;i<=I;i++) cDisplacement(p,i);
-		});
+		ps.stream().forEach(p->cDisplacement(p));
 	}
 	
-	static void cDisplacement(Particle p,int trNum){
+	static void cDisplacement(Particle p){
 		int tlen=p.getTCount();
 		
 		float undef=Record.undef;
 		
 		// get crossing contour displacement, then integrate to get position for a new Particle
-		float[] tr=p.getAttachedData(trNum-1+4);
-		float[] gd=p.getAttachedData(trNum-1+4+varNames.length);
+		float[] tr=p.getAttachedData(TRS);
+		float[] gd=p.getAttachedData(GRD);
 		
 		tr=FilterModel.runningMean(tr,3,undef);
 		gd=FilterModel.runningMean(gd,3,undef);
@@ -294,15 +194,15 @@ public final class AlgTrackSample{
 		for(int l=1;l<tlen;l++){
 			Record o=p.getRecord(l);
 			
-			o.setData(trNum-1+4+varNames.length*3,dsplcmt[l-1]);
+			o.setData(DSP,dsplcmt[l-1]);
 		}
 	}
 	
-	static void cYPositionByDisplacement(List<Particle> ps,int trNum){
-		ps.stream().forEach(p->toPositionParticle(p,trNum));
+	static void cYPositionByDisplacement(List<Particle> ps){
+		ps.stream().forEach(p->toPositionParticle(p));
 	}
 	
-	static void toPositionParticle(Particle p,int trNum){
+	static void toPositionParticle(Particle p){
 		int tlen=p.getTCount();
 		
 		boolean out=false;
@@ -315,7 +215,7 @@ public final class AlgTrackSample{
 		for(int l=1;l<tlen;l++){
 			Record o=p.getRecord(l);
 			
-			float disp=o.getDataValue(trNum-1+4+3*varNames.length);
+			float disp=o.getDataValue(DSP);
 			
 			if(disp==Record.undef){ disp=0; out=true;}
 			
@@ -329,7 +229,7 @@ public final class AlgTrackSample{
 	}
 	
 	
-	static void calDiffMap(List<Particle> ps,int trNum,String test){
+	static void calDiffMap(List<Particle> ps,String test){
 		final DataDescriptor dd=DiagnosisFactory.parseContent(
 			"dset ^Stat.dat\r\n" + 
 			"options big_endian\r\n" + 
@@ -366,7 +266,7 @@ public final class AlgTrackSample{
 			stats3[i].setName(stats3[i].getName()+"3");
 		}
 		
-		DataWrite dw=DataIOFactory.getDataWrite(dd,path+"dispInCC/"+test+"/LagStat/CTCoord/diffMapTr"+trNum+"InCC"+str+"_"+end+".dat");
+		DataWrite dw=DataIOFactory.getDataWrite(dd,Parameters.path+"dispInCC/"+test+"/LagStat/CTCoord/diffMap"+TRS.name+"InCC"+str+"_"+end+".dat");
 		dw.writeData(dd,ArrayUtil.concatAll(Variable.class,stats1,stats2,stats3));
 		dw.closeFile();
 	}
@@ -402,7 +302,7 @@ public final class AlgTrackSample{
 		catch(IOException e){ e.printStackTrace(); System.exit(0);}
 	}
 	
-	static void toSPStatFile(List<Particle> ps,String out,int trNum){
+	static void toSPStatFile(List<Particle> ps,String out){
 		DataDescriptor dd=DiagnosisFactory.getDataDescriptor("H:/cartRL_advSchemes/Leith1_k0/Stat.cts");
 		
 		LagrangianStatisticsByDavis lstat=new LagrangianStatisticsByDavis(ps,dd);
@@ -415,20 +315,22 @@ public final class AlgTrackSample{
 		SingleParticleStatResult r2=lstat.cStatisticsByTaylorTheory    (psudoTrackCond,50);
 		SingleParticleStatResult r3=lstat.cStatisticsByDispersionTheory(psudoTrackCond,50);
 		
-		r1.toFile(out+"TR"+trNum+"SPInCC1.txt");
-		r2.toFile(out+"TR"+trNum+"SPInCC2.txt");
-		r3.toFile(out+"TR"+trNum+"SPInCC3.txt");
+		r1.toFile(out+TRS.name+"SPInCC1.txt");
+		r2.toFile(out+TRS.name+"SPInCC2.txt");
+		r3.toFile(out+TRS.name+"SPInCC3.txt");
 	}
 	
 	static Variable toTimeSeries(Particle p){
-		int t=p.getTCount(),z=2+varNames.length*varGroups;
+		AttachedMeta[] meta=p.getAttachedMeta();
+		
+		int t=p.getTCount(),z=meta.length;
 		
 		Variable v=new Variable("v"+p.getID(),new Range(t,z,1,1));
 		
 		float[][][][] vdata=v.getData();
 		
 		for(int k=0;k<z;k++){
-			float[] data=p.getAttachedData(k);
+			float[] data=p.getAttachedData(meta[k]);
 			
 			for(int l=0;l<t;l++) vdata[k][0][0][l]=data[l];
 		};

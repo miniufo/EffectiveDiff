@@ -9,6 +9,7 @@ import fltDispersion.FLTUtils;
 import fltDispersion.FltInitData;
 import fltDispersion.FltParticle;
 import miniufo.diagnosis.MDate;
+import miniufo.lagrangian.AttachedMeta;
 import miniufo.lagrangian.Particle;
 import miniufo.util.Region2D;
 
@@ -23,16 +24,18 @@ public final class Parameters{
 	public static final float depth=3500;
 	public static final float tauMax=0.5f;
 	
+	public static final MDate baseTime=new MDate(2000,1,1,0,0);
+	
 	public static final String path="D:/Data/MITgcm/barotropicDG/BetaCartRL/";
 	
 	public static final Region2D region=new Region2D(0,0,res*(x-1),res*(y-1));
 	
 	
 	public static List<Particle> getParticlesDeployedInRegion(String initFile,String outPath,Region2D r){
-		return getParticlesDeployedInRegion(initFile,outPath,r,2,new String[]{"uvel","vvel"});
+		return getParticlesDeployedInRegion(initFile,outPath,r,Particle.UVEL,Particle.VVEL);
 	}
 	
-	public static List<Particle> getParticlesDeployedInRegion(String initFile,String outPath,Region2D r,int attLen,String[] vNames){
+	public static List<Particle> getParticlesDeployedInRegion(String initFile,String outPath,Region2D r,AttachedMeta... meta){
 		Predicate<FltInitData> inRegion=fid->{
 			return	fid.xpart>r.getXMin()&&fid.xpart<r.getXMax()&&
 					fid.ypart>r.getYMin()&&fid.ypart<r.getYMax();
@@ -44,9 +47,9 @@ public final class Parameters{
 		
 		for(int i=0,I=ids.length;i<I;i++) ids[i]=inis.get(i).npart;
 		
-		List<FltParticle> fps=FLTUtils.readFLTTrajectory(outPath,new MDate(2000,1,1,0,0),rec->IDInList(ids,rec.getID()));
+		List<FltParticle> fps=FLTUtils.readFLTTrajectory(outPath,baseTime,rec->IDInList(ids,rec.getID()));
 		
-		return fps.stream().map(fp->FLTUtils.toParticle(fp,attLen,vNames,false)).collect(Collectors.toList());
+		return fps.stream().map(fp->FLTUtils.toParticle(fp,false,meta)).collect(Collectors.toList());
 	}
 	
 	

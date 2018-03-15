@@ -43,7 +43,7 @@ public final class mapKeffToXY{
 	static Stream<Variable> mapToXY(Variable tr){
 		ReductionDiags.changeBCToUndef(tr);
 		
-		ccsm.initContourByTracer(tr,numOfC,1,true);
+		ccsm.initContourByTracer(tr,numOfC,1,false,true);
 		
 		KeffInCTS keffCTS=new KeffInCTS(ccsm);
 		

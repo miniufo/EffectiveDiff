@@ -15,17 +15,17 @@ public final class DiagKeff{
 	//
 	private static final int numOfC=201;
 	private static final int interpY=400;
-	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("H:/cartRL_advSchemes/Leith1_k200/Stat.cts");
+	private static final String test="ctrl";
+	private static final DiagnosisFactory df=DiagnosisFactory.parseFile("H:/dispInCC/"+test+"/Stat.cts");
 	private static final DataDescriptor dd=df.getDataDescriptor();
 	private static final ContourCartesianSpatialModel ccsm=new ContourCartesianSpatialModel(dd);
-	private static final String path=Parameters.path;
 	
 	
 	//
 	public static void main(String[] args){
 		df.setPrinting(false);
 		
-		CtlDataWriteStream cdws=new CtlDataWriteStream(path+"Leith1/Leith1_k200/Keff.dat"); cdws.setPrinting(false);
+		CtlDataWriteStream cdws=new CtlDataWriteStream("H:/dispInCC/"+test+"/test.dat"); cdws.setPrinting(false);
 		df.getVariablesTimeByTime("tr1","tr2","tr3","tr4","tr5","tr6","tr7","tr8","tr9","tr10")
 			.peek(vs->{
 				int t=vs[0].getRange().getTRange()[0];
@@ -44,7 +44,7 @@ public final class DiagKeff{
 	static Stream<Variable> computeKeff(Variable tr){
 		ReductionDiags.changeBCToUndef(tr);
 		
-		ccsm.initContourByTracer(tr,numOfC,2,true);
+		ccsm.initContourByTracer(tr,numOfC,2,false,true);
 		KeffInCTS keffCTS=new KeffInCTS(ccsm);
 		
 		Variable area   =ccsm.getAreasBoundedByContour();

@@ -22,8 +22,8 @@ public final class ReductionDiags{
 	private static final CartesianSpatialModel csm=new CartesianSpatialModel(dd);
 	private static final DynamicMethodsInCTS dm=new DynamicMethodsInCTS(csm);
 	
-	private static final int y=dd.getYCount();
-	private static final int x=dd.getXCount();
+	private static final int y=Parameters.y;
+	private static final int x=Parameters.x;
 	
 	private static final String path=Parameters.path;
 	

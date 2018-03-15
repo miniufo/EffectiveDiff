@@ -11,7 +11,6 @@ import miniufo.application.statisticsModel.LagrangianStatisticsByDavis;
 import miniufo.basic.ArrayUtil;
 import miniufo.descriptor.DataDescriptor;
 import miniufo.diagnosis.DiagnosisFactory;
-import miniufo.diagnosis.MDate;
 import miniufo.diagnosis.Variable;
 import miniufo.io.DataIOFactory;
 import miniufo.io.DataWrite;
@@ -80,7 +79,7 @@ public final class LagDiffMap{
 	}
 	
 	static List<Particle> getParticles(String outPath){
-		List<FltParticle> fps=FLTUtils.readFLTTrajectory(outPath,new MDate(2000,1,1,0,0),rec->true);
+		List<FltParticle> fps=FLTUtils.readFLTTrajectory(outPath,Parameters.baseTime,rec->true);
 		
 		return fps.stream().map(fp->toParticle(fp)).collect(Collectors.toList());
 	}
@@ -91,7 +90,7 @@ public final class LagDiffMap{
 		
 		for(FltRecord fr:fp.recs) p.addRecord(toRecord(fr));
 		
-		p.setAttachedDataNames("uvel","vvel");
+		p.setAttachedMeta(Particle.UVEL,Particle.VVEL);
 		
 		return p;
 	}
@@ -105,8 +104,8 @@ public final class LagDiffMap{
 		// attached data: u, v
 		Record r=new Record(time,xpos,ypos,2);
 		
-		r.setData(0,fr.getUVel()[0]);
-		r.setData(1,fr.getVVel()[0]);
+		r.setData(Particle.UVEL,fr.getUVel()[0]);
+		r.setData(Particle.VVEL,fr.getVVel()[0]);
 		
 		return r;
 	}

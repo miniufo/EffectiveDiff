@@ -14,6 +14,7 @@ import miniufo.application.statisticsModel.ParticlePair;
 import miniufo.descriptor.DataDescriptor;
 import miniufo.diagnosis.DiagnosisFactory;
 import miniufo.diagnosis.Variable;
+import miniufo.lagrangian.LagrangianSampling;
 import miniufo.lagrangian.Particle;
 import miniufo.lagrangian.Record;
 import miniufo.util.GridDataFetcher;
@@ -57,7 +58,7 @@ public final class LagrangianStat{
 			
 			List<Particle> ps=Parameters.getParticlesDeployedInRegion(path+"fltInit_11km_All.bin",path+testPath+"fltOutput/",region);
 			
-			sampleFlow("H:/cartRL_advSchemes/Leith1_k0/Stat.cts",ps);
+			new LagrangianSampling(ps).sampleVariables("H:/cartRL_advSchemes/Leith1_k0/Stat.cts");
 			
 			//LagrangianUtil.writeTrajecories(ps,path+testPath+"TXT/TXT"+region.getName()+"/",true,r->true);
 			
@@ -104,8 +105,8 @@ public final class LagrangianStat{
 			float urec=gdsU.fetchXYBuffer(xpos,ypos,bufU);
 			float vrec=gdsV.fetchXYBuffer(xpos,ypos,bufV);
 			
-			float ucurr=r.getDataValue(0);	// u current
-			float vcurr=r.getDataValue(1);	// v current
+			float ucurr=r.getDataValue(Particle.UVEL);
+			float vcurr=r.getDataValue(Particle.VVEL);
 			
 			if(urec==undef){
 				if(xpos<xmin&&ypos>ymin){
@@ -157,45 +158,8 @@ public final class LagrangianStat{
 				System.out.println("at "+r.getTime()+" vm ("+urec+") undef for xpos:"+xpos+" ("+(xpos>xmax)+"), ypos:"+ypos+" ("+(ypos>ymax)+")");
 			}
 			
-			r.setData(0,ucurr-urec);
-			r.setData(1,vcurr-vrec);
-		}
-		
-		TicToc.toc(TimeUnit.SECONDS);
-	}
-	
-	static void sampleFlow(String flowFile,List<Particle> ps){
-		TicToc.tic("sample the flow");
-		
-		DiagnosisFactory df=DiagnosisFactory.parseFile(flowFile);
-		DataDescriptor dd=df.getDataDescriptor();
-		
-		GridDataFetcher gdsU=new GridDataFetcher(dd);
-		GridDataFetcher gdsV=new GridDataFetcher(dd);
-		
-		for(int ll=0,LL=ps.get(0).getTCount();ll<LL;ll++){
-			long time=ps.get(0).getTime(ll);
-			
-			int tstep=dd.getTNum(time)+1;
-			
-			Variable bufU=gdsU.prepareXYBuffer("u",tstep,1);
-			Variable bufV=gdsV.prepareXYBuffer("v",tstep,1);
-			
-			for(Particle p:ps){
-				Record r=p.getRecord(ll);
-				
-				float xpos=r.getXPos();
-				float ypos=r.getYPos();
-				
-				float urec=gdsU.fetchXYBuffer(xpos,ypos,bufU);
-				float vrec=gdsV.fetchXYBuffer(xpos,ypos,bufV);
-				
-				if(urec==-9.99e8) System.out.println("um ("+urec+") undef for xpos:"+xpos+", ypos:"+ypos);
-				if(vrec==-9.99e8) System.out.println("vm ("+urec+") undef for xpos:"+xpos+", ypos:"+ypos);
-				
-				r.setData(2,urec);
-				r.setData(3,vrec);
-			}
+			r.setData(Particle.UVEL,ucurr-urec);
+			r.setData(Particle.VVEL,vcurr-vrec);
 		}
 		
 		TicToc.toc(TimeUnit.SECONDS);
